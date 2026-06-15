@@ -1,0 +1,16 @@
+Building for debugging...
+[1 / 4]
+[2 / 5] LibSignalClient
+/Users/albertonunez/Documents/Windsurf/BurnBar/Vendor/libsignal/swift/Sources/LibSignalClient/TokioAsyncContext.swift:130:25: [1;33mwarning: [1;39mcapture of non-Sendable type 'Promise.Type' in an isolated closure[0;0m [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/sendable-metatypes\SendableMetatypes]8;;\]
+[0;36m128 |[0;0m                 operation: {
+[0;36m129 |[0;0m                     try await LibSignalClient.invokeAsyncFunction(
+[0;36m130 |[0;0m                         { @Sendable (promise: UnsafeMutablePointer<Promise>) in
+    [0;36m|[0;0m                         `- [1;33mwarning: [1;39mcapture of non-Sendable type 'Promise.Type' in an isolated closure[0;0m [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/sendable-metatypes\SendableMetatypes]8;;\]
+[0;36m131 |[0;0m                             self.withNativeHandle { handle in
+[0;36m132 |[0;0m                                 wrapper.call(UnsafeMutableRawPointer(promise), handle)
+
+[#SendableMetatypes]: <https://docs.swift.org/compiler/documentation/diagnostics/sendable-metatypes>
+[5 / 8] LibSignalClient
+[21 / 24] LibSignalClient
+[22 / 24] LibSignalClient
+Build complete! (1.25 sec)
