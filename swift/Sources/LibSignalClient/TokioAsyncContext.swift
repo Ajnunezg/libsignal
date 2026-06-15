@@ -103,6 +103,26 @@ internal class TokioAsyncContext: NativeHandleOwner<SignalMutPointerTokioAsyncCo
         }
     }
 
+    private final class AsyncBodyHandoff<Promise: PromiseStruct>: @unchecked Sendable {
+        private let body: (UnsafeMutablePointer<Promise>, SignalMutPointerTokioAsyncContext) -> SignalFfiErrorRef?
+
+        init(
+            _ body: @escaping (
+                UnsafeMutablePointer<Promise>,
+                SignalMutPointerTokioAsyncContext
+            ) -> SignalFfiErrorRef?
+        ) {
+            self.body = body
+        }
+
+        func callAsFunction(
+            _ promise: UnsafeMutablePointer<Promise>,
+            _ context: SignalMutPointerTokioAsyncContext
+        ) -> SignalFfiErrorRef? {
+            body(promise, context)
+        }
+    }
+
     /// Provides a callback and context for calling Promise-based libsignal\_ffi functions, with cancellation supported.
     ///
     /// Example:
@@ -115,24 +135,29 @@ internal class TokioAsyncContext: NativeHandleOwner<SignalMutPointerTokioAsyncCo
     internal func invokeAsyncFunction<Promise: PromiseStruct>(
         _ body: (UnsafeMutablePointer<Promise>, SignalMutPointerTokioAsyncContext) -> SignalFfiErrorRef?
     ) async throws -> Promise.Result {
-        let cancellationHelper = CancellationHandoffHelper(context: self)
-        return try await withTaskCancellationHandler(
-            operation: {
-                try await LibSignalClient.invokeAsyncFunction(
-                    { promise in
-                        withNativeHandle { handle in
-                            body(promise, handle)
+        return try await withoutActuallyEscaping(body) { escapableBody in
+            let bodyHandoff = AsyncBodyHandoff(escapableBody)
+            let cancellationHelper = CancellationHandoffHelper(context: self)
+            return try await withTaskCancellationHandler(
+                operation: {
+                    let start: @Sendable (UnsafeMutablePointer<Promise>) -> SignalFfiErrorRef? = { promise in
+                        self.withNativeHandle { handle in
+                            bodyHandoff(promise, handle)
                         }
-                    },
-                    saveCancellationId: {
-                        cancellationHelper.setCancellationId($0)
                     }
-                )
-            },
-            onCancel: {
-                cancellationHelper.cancel()
-            }
-        )
+                    let saveCancellationId: @Sendable (SignalCancellationId) -> Void = { id in
+                        cancellationHelper.setCancellationId(id)
+                    }
+                    return try await LibSignalClient.invokeAsyncFunction(
+                        start,
+                        saveCancellationId: saveCancellationId
+                    )
+                },
+                onCancel: {
+                    cancellationHelper.cancel()
+                }
+            )
+        }
     }
 }
 

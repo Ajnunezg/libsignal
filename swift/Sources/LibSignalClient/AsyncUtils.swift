@@ -218,8 +218,8 @@ private class Completer<Promise: PromiseStruct>: CompleterBase {
 /// Prefer ``TokioAsyncContext/invokeAsyncFunction(_:)`` if using a TokioAsyncContext;
 /// that method supports cancellation.
 internal func invokeAsyncFunction<Promise: PromiseStruct>(
-    _ body: (UnsafeMutablePointer<Promise>) -> SignalFfiErrorRef?,
-    saveCancellationId: (SignalCancellationId) -> Void = { _ in }
+    _ body: @Sendable (UnsafeMutablePointer<Promise>) -> SignalFfiErrorRef?,
+    saveCancellationId: @Sendable (SignalCancellationId) -> Void = { _ in }
 ) async throws -> Promise.Result {
     try await withCheckedThrowingContinuation { continuation in
         let completer = Completer<Promise>(continuation: continuation)
