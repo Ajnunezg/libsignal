@@ -6,6 +6,10 @@
 import Foundation
 import SignalFfi
 
+fileprivate struct TokioBodyWrapper: @unchecked Sendable {
+    let call: (UnsafeMutableRawPointer, SignalMutPointerTokioAsyncContext) -> SignalFfiErrorRef?
+}
+
 internal class TokioAsyncContext: NativeHandleOwner<SignalMutPointerTokioAsyncContext>, @unchecked Sendable {
     convenience init() {
         let handle = failOnError {
@@ -115,24 +119,29 @@ internal class TokioAsyncContext: NativeHandleOwner<SignalMutPointerTokioAsyncCo
     internal func invokeAsyncFunction<Promise: PromiseStruct>(
         _ body: (UnsafeMutablePointer<Promise>, SignalMutPointerTokioAsyncContext) -> SignalFfiErrorRef?
     ) async throws -> Promise.Result {
-        let cancellationHelper = CancellationHandoffHelper(context: self)
-        return try await withTaskCancellationHandler(
-            operation: {
-                try await LibSignalClient.invokeAsyncFunction(
-                    { promise in
-                        withNativeHandle { handle in
-                            body(promise, handle)
+        try await withoutActuallyEscaping(body) { escapingBody in
+            let wrapper = TokioBodyWrapper(call: { promiseRaw, context in
+                escapingBody(promiseRaw.assumingMemoryBound(to: Promise.self), context)
+            })
+            let cancellationHelper = CancellationHandoffHelper(context: self)
+            return try await withTaskCancellationHandler(
+                operation: {
+                    try await LibSignalClient.invokeAsyncFunction(
+                        { @Sendable (promise: UnsafeMutablePointer<Promise>) in
+                            self.withNativeHandle { handle in
+                                wrapper.call(UnsafeMutableRawPointer(promise), handle)
+                            }
+                        },
+                        saveCancellationId: { @Sendable in
+                            cancellationHelper.setCancellationId($0)
                         }
-                    },
-                    saveCancellationId: {
-                        cancellationHelper.setCancellationId($0)
-                    }
-                )
-            },
-            onCancel: {
-                cancellationHelper.cancel()
-            }
-        )
+                    )
+                },
+                onCancel: {
+                    cancellationHelper.cancel()
+                }
+            )
+        }
     }
 }
 

@@ -32,7 +32,7 @@ extension UnauthenticatedChatConnection: UnauthUsernamesService {
     public func lookUpUsernameHash(_ hash: Data) async throws -> Aci? {
         let rawResponse: SignalOptionalUuid = try await self.tokioAsyncContext
             .invokeAsyncFunction { promise, tokioAsyncContext in
-                withNativeHandle { chatService in
+                self.withNativeHandle { chatService in
                     hash.withUnsafeBorrowedBuffer { hash in
                         signal_unauthenticated_chat_connection_look_up_username_hash(
                             promise,
@@ -53,7 +53,7 @@ extension UnauthenticatedChatConnection: UnauthUsernamesService {
     public func lookUpUsernameLink(_ uuid: UUID, entropy: Data) async throws -> Username? {
         var rawResponse: SignalOptionalPairOfCStringPtru832 = try await self.tokioAsyncContext
             .invokeAsyncFunction { promise, tokioAsyncContext in
-                withNativeHandle { chatService in
+                self.withNativeHandle { chatService in
                     try! withAllBorrowed(uuid, entropy) { uuid, entropy in
                         signal_unauthenticated_chat_connection_look_up_username_link(
                             promise,
