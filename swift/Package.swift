@@ -10,28 +10,68 @@ import Foundation
 
 let rustBuildDir = "../target/debug/"
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-let hasOpenBurnBarSignalFfiXCFramework = FileManager.default.fileExists(
+let hasOpenBurnBarSignalFfiIOSXCFramework = FileManager.default.fileExists(
+    atPath: packageRoot
+        .appendingPathComponent("../../OpenBurnBarSignalFfiIOS.xcframework")
+        .standardizedFileURL
+        .path
+)
+let hasOpenBurnBarSignalFfiMacXCFramework = FileManager.default.fileExists(
+    atPath: packageRoot
+        .appendingPathComponent("../../OpenBurnBarSignalFfiMac.xcframework")
+        .standardizedFileURL
+        .path
+)
+let hasLegacyOpenBurnBarSignalFfiXCFramework = FileManager.default.fileExists(
     atPath: packageRoot
         .appendingPathComponent("../../OpenBurnBarSignalFfi.xcframework")
         .standardizedFileURL
         .path
 )
 
-let signalFfiBinaryTargets: [Target] = hasOpenBurnBarSignalFfiXCFramework ? [
-    .binaryTarget(
-        name: "OpenBurnBarLibSignalFfi",
-        path: "../../OpenBurnBarSignalFfi.xcframework"
-    )
-] : []
+let signalFfiBinaryTargets: [Target] = {
+    var targets: [Target] = []
+    if hasOpenBurnBarSignalFfiIOSXCFramework {
+        targets.append(.binaryTarget(
+            name: "OpenBurnBarLibSignalFfiIOS",
+            path: "../../OpenBurnBarSignalFfiIOS.xcframework"
+        ))
+    }
+    if hasOpenBurnBarSignalFfiMacXCFramework {
+        targets.append(.binaryTarget(
+            name: "OpenBurnBarLibSignalFfiMac",
+            path: "../../OpenBurnBarSignalFfiMac.xcframework"
+        ))
+    }
+    if targets.isEmpty && hasLegacyOpenBurnBarSignalFfiXCFramework {
+        targets.append(.binaryTarget(
+            name: "OpenBurnBarLibSignalFfi",
+            path: "../../OpenBurnBarSignalFfi.xcframework"
+        ))
+    }
+    return targets
+}()
 
-let libSignalClientDependencies: [Target.Dependency] = hasOpenBurnBarSignalFfiXCFramework
-    ? ["SignalFfi", "OpenBurnBarLibSignalFfi"]
-    : ["SignalFfi"]
+let libSignalClientDependencies: [Target.Dependency] = {
+    var dependencies: [Target.Dependency] = ["SignalFfi"]
+    if hasOpenBurnBarSignalFfiIOSXCFramework {
+        dependencies.append(.target(name: "OpenBurnBarLibSignalFfiIOS", condition: .when(platforms: [.iOS])))
+    }
+    if hasOpenBurnBarSignalFfiMacXCFramework {
+        dependencies.append(.target(name: "OpenBurnBarLibSignalFfiMac", condition: .when(platforms: [.macOS])))
+    }
+    if dependencies.count == 1 && hasLegacyOpenBurnBarSignalFfiXCFramework {
+        dependencies.append("OpenBurnBarLibSignalFfi")
+    }
+    return dependencies
+}()
 
 let libSignalClientLinkerSettings: [LinkerSetting] = [
     .linkedLibrary("stdc++", .when(platforms: [.linux]))
-] + (hasOpenBurnBarSignalFfiXCFramework ? [] : [
-    .unsafeFlags(["-L\(rustBuildDir)"])
+] + (hasOpenBurnBarSignalFfiIOSXCFramework || hasLegacyOpenBurnBarSignalFfiXCFramework ? [] : [
+    .unsafeFlags(["-L\(rustBuildDir)"], .when(platforms: [.iOS]))
+]) + (hasOpenBurnBarSignalFfiMacXCFramework || hasLegacyOpenBurnBarSignalFfiXCFramework ? [] : [
+    .unsafeFlags(["-L\(rustBuildDir)"], .when(platforms: [.macOS]))
 ])
 
 let package = Package(
