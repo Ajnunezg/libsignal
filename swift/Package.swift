@@ -43,7 +43,7 @@ let signalFfiBinaryTargets: [Target] = {
             path: "../../OpenBurnBarSignalFfiMac.xcframework"
         ))
     }
-    if targets.isEmpty && hasLegacyOpenBurnBarSignalFfiXCFramework {
+    if hasLegacyOpenBurnBarSignalFfiXCFramework && !hasOpenBurnBarSignalFfiMacXCFramework {
         targets.append(.binaryTarget(
             name: "OpenBurnBarLibSignalFfi",
             path: "../../OpenBurnBarSignalFfi.xcframework"
@@ -60,15 +60,15 @@ let libSignalClientDependencies: [Target.Dependency] = {
     if hasOpenBurnBarSignalFfiMacXCFramework {
         dependencies.append(.target(name: "OpenBurnBarLibSignalFfiMac", condition: .when(platforms: [.macOS])))
     }
-    if dependencies.count == 1 && hasLegacyOpenBurnBarSignalFfiXCFramework {
-        dependencies.append("OpenBurnBarLibSignalFfi")
+    if hasLegacyOpenBurnBarSignalFfiXCFramework && !hasOpenBurnBarSignalFfiMacXCFramework {
+        dependencies.append(.target(name: "OpenBurnBarLibSignalFfi", condition: .when(platforms: [.macOS])))
     }
     return dependencies
 }()
 
 let libSignalClientLinkerSettings: [LinkerSetting] = [
     .linkedLibrary("stdc++", .when(platforms: [.linux]))
-] + (hasOpenBurnBarSignalFfiIOSXCFramework || hasLegacyOpenBurnBarSignalFfiXCFramework ? [] : [
+] + (hasOpenBurnBarSignalFfiIOSXCFramework ? [] : [
     .unsafeFlags(["-L\(rustBuildDir)"], .when(platforms: [.iOS]))
 ]) + (hasOpenBurnBarSignalFfiMacXCFramework || hasLegacyOpenBurnBarSignalFfiXCFramework ? [] : [
     .unsafeFlags(["-L\(rustBuildDir)"], .when(platforms: [.macOS]))
